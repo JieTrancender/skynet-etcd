@@ -8,9 +8,10 @@ local type         = type
 
 local _M = {}
 
-function _M.clear_tab(t)
+local function clear_tab(t)
     t = {}
 end
+_M.clear_tab = clear_tab
 
 function _M.split(s, delim)
     local sp = {}

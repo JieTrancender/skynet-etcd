@@ -46,7 +46,7 @@ function _M.new(opts)
     end
 
     opts.timeout = opts.timeout or 5
-    opts.http_host = opts.htt_post or "http://127.0.0.1:2379"
+    opts.http_host = opts.http_host or "http://127.0.0.1:2379"
     opts.ttl = opts.ttl or -1
 
     local protocol = opts and opts.protocol or "v2"
@@ -72,3 +72,5 @@ function _M.new(opts)
 
     return etcdv2.new(opts)
 end
+
+return _M
