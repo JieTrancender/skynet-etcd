@@ -167,4 +167,9 @@ function _M.version(self)
     return _request(self, endpoint.http_host, "GET", endpoint.version, nil, self.timeout)
 end
 
+function _M.stats_self(self)
+    local endpoint = choose_endpoint(self)
+    return _request(self, endpoint.http_host, "GET", endpoint.stats_self, nil, self.timeout)
+end
+
 return _M
