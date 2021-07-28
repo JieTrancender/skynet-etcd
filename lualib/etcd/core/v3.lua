@@ -9,6 +9,7 @@ local string_match = string.match
 local table_insert = table.insert
 local decode_json  = cjson.decode
 local encode_json  = cjson.encode
+local now          = os.time
 
 local _M = {}
 
@@ -21,7 +22,7 @@ end
 -- define local refresh function variable
 local refresh_jwt_token
 
-local function _request(self, host, method, uri, opts, timeout, ignore_auth)
+local function _request_uri(self, host, method, uri, opts, timeout, ignore_auth)
     utils.log_info("v3 request uri: ", uri, ", timeout: ", timeout)
 
     local body
@@ -237,27 +238,27 @@ function refresh_jwt_token(self, timeout)
     end
 
     local res
-    res, err = _request_uri(self, endpoint, 'POST',
+    res, err = _request_uri(self, endpoint.http_host, 'POST',
                                   endpoint.full_prefix .. "/auth/authenticate",
                                   opts, timeout, true)
     self.requesting_token = false
 
     if err then
         self.last_refresh_jwt_err = err
-        wake_up_everyone(self)
+        -- wake_up_everyone(self)
         return nil, err
     end
 
     if not res or not res.body or not res.body.token then
         err = 'authenticate refresh token fail'
         self.last_refresh_jwt_err = err
-        wake_up_everyone(self)
+        -- wake_up_everyone(self)
         return nil, err
     end
 
     self.jwt_token = res.body.token
     self.last_auth_time = now()
-    wake_up_everyone(self)
+    -- wake_up_everyone(self)
 
     return true, nil
 end
@@ -268,7 +269,7 @@ function _M.version(self)
         return nil, err
     end
 
-    return _request(self, endpoint.http_host, "GET", endpoint.http_host .. "/version", nil, self.timeout)
+    return _request_uri(self, endpoint.http_host, "GET", endpoint.http_host .. "/version", nil, self.timeout)
 end
 
 return _M
