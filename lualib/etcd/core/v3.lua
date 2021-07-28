@@ -291,6 +291,8 @@ local function set(self, key, val, attr)
         return nil, err
     end
 
+    attr = attr or {}
+    
     local lease
     if attr.lease then
         lease = attr.lease
@@ -452,6 +454,45 @@ local function get(self, key, attr)
     return res, err
 end
 
+local function delete(self, key, attr)
+    -- verify key
+    local _, err = utils.verify_key(key)
+    if err then
+        return nil, err
+    end
+    
+    attr = attr or {}
+
+    local range_end
+    if attr.range_end then
+        range_end = encode_base64(attr.range_end)
+    end
+
+    local prev_kv
+    if attr.prev_kv then
+        prev_kv = true
+    end
+
+    key = encode_base64(key)
+
+    local opts = {
+        body = {
+            key = key,
+            range_end = range_end,
+            prev_kv = prev_kv
+        }
+    }
+
+    local endpoint
+    endpoint, err = choose_endpoint(self)
+    if not endpoint then
+        return nil, err
+    end
+
+    return _request_uri(self, endpoint.http_host, "POST", endpoint.full_prefix .. "/kv/deleterange", opts,
+        self.timeout)
+end
+
 do
     local attr = {}
 function _M.get(self, key, opts)
@@ -487,6 +528,22 @@ function _M.set(self, key, val, opts)
 end
     
 end  -- do
+
+do
+    local attr = {}
+function _M.delete(self, key, opts)
+    clear_tab(attr)
+
+    key = utils.get_real_key(self.key_prefix, key)
+
+    attr.timeout = opts and opts.timeout
+    attr.prev_kv = opts and opts.prev_kv
+
+    return delete(self, key, attr)
+end
+    
+end  -- do
+
 
 function _M.version(self)
     local endpoint, err = choose_endpoint(self)

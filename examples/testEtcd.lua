@@ -40,4 +40,11 @@ skynet.start(function()
 		return
 	end
 	print(string.format("key %s is %s", etcd_base_path.."hello", table_dump_line(res.body)))
+
+	res, err = etcdd.req.delete(etcd_base_path.."hello")
+	if not res then
+		print(string.format("delete %s fail, err: %s", etcd_base_path.."hello", err))
+		return
+	end
+	print(string.format("delete key %s, res: %s", etcd_base_path.."hello", table_dump_line(res)))
 end)
