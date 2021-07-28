@@ -674,6 +674,31 @@ function _M.txn(self, compare, success, failure, opts)
     return txn(self, opts, compare, success, failure)
 end
 
+function _M.grant(self, ttl, id)
+    if ttl == nil then
+        return nil, "lease grant command needs TTL argument"
+    end
+
+    if not typeof.int(ttl) then
+        return nil, "ttl must be integer"
+    end
+
+    id = id or 0
+    local opts = {
+        body = {
+            TTL = ttl,
+            ID = id
+        }
+    }
+
+    local endpoint, err = choose_endpoint(self)
+    if not endpoint then
+        return nil, err
+    end
+
+    return _request_uri(self, endpoint.http_host, "POST", endpoint.full_prefix .. "/lease/grant", opts)
+end
+
 do
     local attr = {}
 function _M.delete(self, key, opts)

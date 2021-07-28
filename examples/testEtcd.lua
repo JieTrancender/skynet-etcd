@@ -83,6 +83,22 @@ local function testsetnx(etcdd)
 	print("------------testsetnx finished")
 end
 
+-- test grant
+local function testgrant(etcdd)
+	print("------------testgrant begin")
+	local res, err = etcdd.req.grant(2)
+	if not res then
+		print("testgrant fail: ", err)
+		return
+	end
+	print(string.format("grant res: %s %s", res.body.ID, res.body.TTL))
+	skynet.sleep(300)
+	res, err = etcdd.req.grant(10, res.body.ID)
+	print(string.format("grant %s res: %s %s", res.body.ID, res.body.ID, res.body.TTL))
+	
+	print("------------testgrant finished")
+end
+
 skynet.start(function()
 	print("token:", create_basicauth(etcd_user, etcd_pass))
 	local etcdd = snax.uniqueservice("etcdd", etcd_hosts, etcd_user, etcd_pass, etcd_protocol)
@@ -98,4 +114,6 @@ skynet.start(function()
 	testsetx(etcdd)
 	
 	testsetnx(etcdd)
+
+	testgrant(etcdd)
 end)
