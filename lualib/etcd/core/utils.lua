@@ -97,11 +97,11 @@ do
     end
 
     function log_info(...)
-        logImp("INFO ", ...)
+        logImp("INFO", ...)
     end
 
     function log_error(...)
-        logImp("ERROR ", ...)
+        logImp("ERROR", ...)
     end
 
     function table_dump_line(obj)
@@ -152,5 +152,14 @@ end
 _M.log_info = log_info
 _M.log_error = log_error
 _M.table_dump_line = table_dump_line
+
+local function verify_key(key)
+    if not key or #key == 0 then
+        return false, "key should not be empty"
+    end
+
+    return true, nil
+end
+_M.verify_key = verify_key
 
 return _M

@@ -8,7 +8,8 @@ function init( ... )
         http_host = generateEtcdHosts(etcdHosts),
         user = user,
         password = password,
-        protocol = protocol
+        protocol = protocol,
+        serializer = "json"  -- 默认使用json格式配置
     }
 
     local err

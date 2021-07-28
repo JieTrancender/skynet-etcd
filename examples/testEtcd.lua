@@ -5,7 +5,7 @@ local snax           = require "skynet.snax"
 local crypt          = require "skynet.crypt"
 local encode_base64  = crypt.base64encode
 
-local etcd_base_path = "/config/dev"
+local etcd_base_path = "/config/dev/"
 local etcd_hosts = "http://127.0.0.1:2379"
 local etcd_user = "root"
 local etcd_pass = "123456"
@@ -26,4 +26,11 @@ skynet.start(function()
 		return
 	end
 	print("etcd version: ", table_dump_line(res.body))
+
+	res, err = etcdd.req.get(etcd_base_path.."hello")
+	if not res then
+		print(string.format("etcd get %s fail, err: %s", etcd_base_path.."hello", err))
+		return
+	end
+	print(string.format("key %s is %s", etcd_base_path.."hello", table_dump_line(res.body)))
 end)
