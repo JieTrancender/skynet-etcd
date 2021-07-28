@@ -70,6 +70,15 @@ function response.rmdir( ... )
     return etcdCli:rmdir(...)
 end
 
+-- v3 support
+function response.grant(ttl, id)
+    return etcdCli:grant(ttl, id)
+end
+
+function accept.grant(ttl, id)
+    etcdCli:grant(ttl, id)
+end
+
 function response.stats_leader()
     return etcdCli:stats_leader()
 end
