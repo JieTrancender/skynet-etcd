@@ -1,4 +1,5 @@
 local c            = require "skynet.core"
+local http         = require "http.httpc"
 local table_concat = table.concat
 local tostring     = tostring
 local select       = select
@@ -96,11 +97,11 @@ do
     end
 
     function log_info(...)
-        logImp("INFO", ...)
+        logImp("INFO ", ...)
     end
 
     function log_error(...)
-        logImp("ERROR", ...)
+        logImp("ERROR ", ...)
     end
 end
 _M.log_info = log_info
