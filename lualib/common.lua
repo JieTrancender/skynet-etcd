@@ -58,11 +58,15 @@ function logImp(...)
         t[i] = tostring(t[i])
     end
 
-    return c.error(table_concat(t, " "))
+    return core.error(table_concat(t, " "))
 end
 
 function logInfo(...)
     logImp("INFO", ...)
+end
+
+function logWarn(...)
+    logImp("Warn", ...)
 end
 
 function logError(...)

@@ -3,17 +3,18 @@ local etcd = require "etcd.etcd"
 
 local etcdCli
 function init( ... )
-    local etcdHosts, user, password = ...
+    local etcdHosts, user, password, protocol = ...
     local opt = {
         http_host = generateEtcdHosts(etcdHosts),
         user = user,
-        password = password
+        password = password,
+        protocol = protocol
     }
 
     local err
     etcdCli, err = etcd.new(opt)
     if not etcdCli then
-        logError("etcdd init wrong, ", etcdHosts)
+        logError("etcdd init wrong, ", err)
         return
     end
 end

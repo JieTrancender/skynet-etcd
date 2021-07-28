@@ -1,5 +1,5 @@
 local etcdv2  = require("etcd.core.v2")
--- local etcdv3  = require("etcd.core.v3")
+local etcdv3  = require("etcd.core.v3")
 local utils   = require("etcd.core.utils")
 local typeof  = require("etcd.core.typeof")
 local require = require
