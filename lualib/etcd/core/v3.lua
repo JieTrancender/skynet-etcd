@@ -34,6 +34,27 @@ local tab_nkeys = function (t)
     return num
 end
 
+local tab_clone = function(obj)
+    local lookup_table = {}
+    local function _copy(object)
+        if type(object) ~= "table" then
+            return object
+        elseif lookup_table[object] then
+            return lookup_table[object]
+        end
+
+        local new_table = {}
+        lookup_table[object] = new_table
+        for index, value in pairs(object) do
+            new_table[_copy(index)] = _copy(value)
+        end
+
+        return new_table
+    end
+
+    return _copy(obj)
+end
+
 -- define local refresh function variable
 local refresh_jwt_token
 
@@ -493,6 +514,33 @@ local function delete(self, key, attr)
         self.timeout)
 end
 
+local function txn(self, opts_arg, compare, success, failure)
+    if #compare < 1 then
+        return nil, "compare couldn't be empty"
+    end
+
+    if (success == nil or #success < 1) and (failure == nil or #failure < 1) then
+        return nil, "success and failure couldn't be empty at the same time"
+    end
+    
+    local timeout = opts_arg and opts_arg.timeout
+    local opts = {
+        body = {
+            compare = compare,
+            success = success,
+            failure = failure
+        }
+    }
+
+    local endpoint, err = choose_endpoint(self)
+    if not endpoint then
+        return nil, err
+    end
+
+    return _request_uri(self, endpoint.http_host, "POST", endpoint.full_prefix .. "/kv/txn", opts,
+        timeout or self.time)
+end
+
 do
     local attr = {}
 function _M.get(self, key, opts)
@@ -528,6 +576,48 @@ function _M.set(self, key, val, opts)
 end
     
 end  -- do
+
+function _M.txn(self, compare, success, failure, opts)
+    local err
+
+    if compare then
+        local new_rules = tab_clone(compare)
+        for i, rule in ipairs(compare) do
+            rule = tab_clone(rule)
+            rule.key = encode_base64(utils.get_real_key(self.key_prefix, rule.key))
+            if rule.value then
+                rule.value, err = serialize_and_encode_base64(self.serializer.serialize, rule.value)
+                if not rule.value then
+                    return nil, "failed to encode value: " .. err
+                end
+            end
+
+            new_rules[i] = rule
+        end
+        compare = new_rules
+    end
+
+    if success then
+        local new_rules = tab_clone(success)
+        for i, rule in ipairs(success) do
+            rule = tab_clone(rule)
+            if rule.requestPut then
+                local requestPut = tab_clone(rule.requestPut)
+                requestPut.key = encode_base64(utils.get_real_key(self.key_prefix, requestPut.key))
+                requestPut.value, err = serialize_and_encode_base64(self.serializer.serialize, requestPut.value)
+                if not requestPut.value then
+                    return nil, "failed to encode value: " .. err
+                end
+
+                rule.requestPut = requestPut
+            end
+            new_rules[i] = rule
+        end
+        success = new_rules
+    end
+
+    return txn(self, opts, compare, success, failure)
+end
 
 do
     local attr = {}
