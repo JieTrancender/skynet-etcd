@@ -1,22 +1,37 @@
-local skynet       = require("skynet")
-local typeof       = require("etcd.core.typeof")
-local utils        = require("etcd.core.utils")
-local cjson        = require("cjson.safe")
-local httpc        = require("http.httpc")
-local setmetatable = setmetatable
-local random       = math.random
-local string_match = string.match
-local table_insert = table.insert
-local decode_json  = cjson.decode
-local encode_json  = cjson.encode
-local now          = os.time
+local skynet        = require("skynet")
+local typeof        = require("etcd.core.typeof")
+local utils         = require("etcd.core.utils")
+local cjson         = require("cjson.safe")
+local httpc         = require("http.httpc")
+local setmetatable  = setmetatable
+local random        = math.random
+local string_match  = string.match
+local table_insert  = table.insert
+local decode_json   = cjson.decode
+local encode_json   = cjson.encode
+local now           = os.time
+local crypt         = require "skynet.crypt"
+local encode_base64 = crypt.base64encode
+local decode_base64 = crypt.base64decode
 
 local _M = {}
 
 local mt = {__index = _M}
 
+local clear_tab = function (t)
+    t = {}
+end
+
 local table_exist_keys = function (t)
     return next(t)
+end
+
+local tab_nkeys = function (t)
+    local num = 0
+    for k, _ in pairs(t) do
+        num = num + 1
+    end
+    return num
 end
 
 -- define local refresh function variable
@@ -45,7 +60,7 @@ local function _request_uri(self, host, method, uri, opts, timeout, ignore_auth)
                 return nil, err
             end
 
-            headers.Authentication = self.jwt_token
+            headers.Authorization = self.jwt_token
         else
             keepalive = false  -- jwt_token not keepalive
         end
@@ -261,6 +276,135 @@ function refresh_jwt_token(self, timeout)
     -- wake_up_everyone(self)
 
     return true, nil
+end
+
+local function get(self, key, attr)
+    -- verify key
+    local _, err = utils.verify_key(key)
+    if err then
+        return nil, err
+    end
+
+    attr = attr or {}
+    
+    local range_end
+    if attr.range_end then
+        range_end = encode_base64(attr.range_end)
+    end
+    
+    local limit
+    if attr.limit then
+        limit = attr.limit
+    end
+
+    local revision
+    if attr.revision then
+        revision = attr.revision
+    end
+
+    local sort_order
+    if attr.sort_order then
+        sort_order = attr.sort_order
+    end
+
+    local sort_target
+    if attr.sort_target then
+        sort_target = attr.sort_target
+    end
+
+    local serializable
+    if attr.serializable then
+        serializable = true
+    end
+
+    local keys_only
+    if attr.keys_only then
+        keys_only = true
+    end
+
+    local count_only
+    if attr.count_only then
+        count_only = true
+    end
+
+    local min_mod_revision
+    if attr.min_mod_revision then
+        min_mod_revision = attr.min_mod_revision
+    end
+
+    local max_mod_revision
+    if attr.max_mod_revision then
+        max_mod_revision = attr.max_mod_revision
+    end
+
+    local min_create_revision
+    if attr.min_create_revision then
+        min_create_revision = attr.min_create_revision
+    end
+
+    local max_create_revision
+    if attr.max_create_revision then
+        max_create_revision = attr.max_create_revision
+    end
+
+    key = encode_base64(key)
+
+    local opts = {
+        body = {
+            key = key,
+            range_end = range_end,
+            limit = limit,
+            revision = revision,
+            sort_order = sort_order,
+            sort_target = sort_target,
+            serializable = serializable,
+            keys_only = keys_only,
+            count_only = count_only,
+            min_mod_revision = min_mod_revision,
+            max_mod_revision = max_mod_revision,
+            min_create_revision = min_create_revision,
+            max_create_revision = max_create_revision
+        }
+    }
+
+    local endpoint
+    endpoint, err = choose_endpoint(self)
+    if not endpoint then
+        return nil, err
+    end
+
+    local res
+    res, err = _request_uri(self, endpoint.http_host, "POST", endpoint.full_prefix.."/kv/range", opts,
+        attr and attr.timeout or self.timeout)
+    if res and res.status == 200 then
+        if res.body.kvs and next(res.body.kvs) then
+            for _, kv in ipairs(res.body.kvs) do
+                kv.key = decode_base64(kv.key)
+                kv.value = decode_base64(kv.value or "")
+                kv.value = self.serializer.deserialize(kv.value)
+            end
+        end
+    end
+
+    return res, err
+end
+
+do
+    local attr = {}
+function _M.get(self, key, opts)
+    if not typeof.string(key) then
+        return nil, 'key must be string'
+    end
+
+    key = utils.get_real_key(self.key_prefix, key)
+
+    clear_tab(attr)
+    attr.timeout = opts and opts.timeout
+    attr.revision = opts and opts.revision
+
+    return get(self, key, attr)
+end
+
 end
 
 function _M.version(self)
