@@ -2,10 +2,13 @@ local skynet       = require("skynet")
 local typeof       = require("etcd.core.typeof")
 local utils        = require("etcd.core.utils")
 local cjson        = require("cjson.safe")
+local httpc        = require("http.httpc")
 local setmetatable = setmetatable
 local random       = math.random
 local string_match = string.match
 local table_insert = table.insert
+local decode_json  = cjson.decode
+local encode_json  = cjson.encode
 
 local _M = {}
 
@@ -18,8 +21,8 @@ end
 -- define local refresh function variable
 local refresh_jwt_token
 
-local function _request(self, endpoint, method, uri, opts, timeout, ignore_auth)
-    utils.logInfo("v3 request uri: ", uri, ", timeout: ", timeout)
+local function _request(self, host, method, uri, opts, timeout, ignore_auth)
+    utils.log_info("v3 request uri: ", uri, ", timeout: ", timeout)
 
     local body
     if opts and opts.body and table_exist_keys(opts.body) then
@@ -47,8 +50,20 @@ local function _request(self, endpoint, method, uri, opts, timeout, ignore_auth)
         end
     end
 
-    local http_cli, err = utils.http.new()
-    
+    local status, body = httpc.request(method, host, uri, recvheader, headers, body)
+    if status >= 500 then
+        return nil, "invalid response code: " .. status
+    end
+
+    if status == 401 then
+        return nil, "insufficient credentials code: " .. status
+    end
+
+    if not typeof.string(body) then
+        return {status = status, body = body}
+    end
+
+    return {status = status, headers = recvheader, body = decode_json(body)}
 end
 
 local function serialize_and_encode_base64(serialize_fn, data)
@@ -182,13 +197,78 @@ local function choose_endpoint(self)
     return endpoints[pos]
 end
 
+-- return refresh_is_ok, error
+function refresh_jwt_token(self, timeout)
+    -- token exist and not expire
+    -- default is 5min, we use 3min plus random seconds to smooth the refresh across workers
+    -- https://github.com/etcd-io/etcd/issues/8287
+    if self.jwt_token and now() - self.last_auth_time < 60 * 3 + random(0, 60) then
+        return true, nil
+    end
+
+    if self.requesting_token then
+        self.sema:wait(timeout)
+        if self.jwt_token and now() - self.last_auth_time < 60 * 3 + random(0, 60) then
+            return true, nil
+        end
+
+        if self.last_refresh_jwt_err then
+            utils.log_info("v3 refresh jwt last err: ", self.last_refresh_jwt_err)
+            return nil, self.last_refresh_jwt_err
+        end
+
+        -- something unexpected happened, try again
+        utils.log_info("v3 try auth after waiting, timeout: ", timeout)
+    end
+
+    self.last_refresh_jwt_err = nil
+    self.requesting_token = true
+
+    local opts = {
+        body = {
+            name         = self.user,
+            password     = self.password,
+        }
+    }
+
+    local endpoint, err = choose_endpoint(self)
+    if not endpoint then
+        return nil, err
+    end
+
+    local res
+    res, err = _request_uri(self, endpoint, 'POST',
+                                  endpoint.full_prefix .. "/auth/authenticate",
+                                  opts, timeout, true)
+    self.requesting_token = false
+
+    if err then
+        self.last_refresh_jwt_err = err
+        wake_up_everyone(self)
+        return nil, err
+    end
+
+    if not res or not res.body or not res.body.token then
+        err = 'authenticate refresh token fail'
+        self.last_refresh_jwt_err = err
+        wake_up_everyone(self)
+        return nil, err
+    end
+
+    self.jwt_token = res.body.token
+    self.last_auth_time = now()
+    wake_up_everyone(self)
+
+    return true, nil
+end
+
 function _M.version(self)
     local endpoint, err = choose_endpoint(self)
     if not endpoint then
         return nil, err
     end
 
-    return _request(self, endpoint, "GET", endpoint.http_host .. "/version", nil, self.timeout)
+    return _request(self, endpoint.http_host, "GET", endpoint.http_host .. "/version", nil, self.timeout)
 end
 
 return _M
