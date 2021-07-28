@@ -45,6 +45,15 @@ function accept.setnx(key, value, ttl)
     etcdCli:setnx(key, value, ttl)
 end
 
+-- v3 support
+function response.setx(key, value, ttl)
+    return etcdCli:setx(key, value, ttl)
+end
+
+function accept.setx(key, value, ttl)
+    etcdCli:setx(key, value, ttl)
+end
+
 function accept.delete( ... )
     etcdCli:delete(...)
 end

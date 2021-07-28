@@ -86,6 +86,9 @@ end
 
 local log_info
 local log_error
+
+-- todo: log level
+local log_level = "ERROR"
 do
     local function logImp(...)
         local t = {...}
@@ -97,6 +100,10 @@ do
     end
 
     function log_info(...)
+        if log_level ~= "INFO" then
+            return
+        end
+        
         logImp("INFO", ...)
     end
 

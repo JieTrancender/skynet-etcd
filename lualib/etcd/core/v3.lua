@@ -603,6 +603,32 @@ function _M.setnx(self, key, val, opts)
 
     return txn(self, opts, compare, success, nil)
 end
+
+-- set key-val and ttl if key is exists (update)
+function _M.setx(self, key, val, opts)
+    clear_tab(compare)
+
+    key = utils.get_real_key(self.key_prefix, key)
+
+    compare[1] = {}
+    compare[1].target = "CREATE"
+    compare[1].key = encode_base64(key)
+    compare[1].createRevision = 0
+
+    clear_tab(failure)
+    failure[1] = {}
+    failure[1].requestPut = {}
+    failure[1].requestPut.key = encode_base64(key)
+
+    local err
+    val, err = serialize_and_encode_base64(self.serializer.serialize, val)
+    if not val then
+        return nil, "failed to encode val: " .. err
+    end
+    failure[1].requestPut.value = val
+
+    return txn(self, opts, compare, nil, failure)
+end
     
 end  -- do
 
