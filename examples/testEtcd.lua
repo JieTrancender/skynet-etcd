@@ -17,6 +17,72 @@ local function create_basicauth(user, password)
     return 'Authorization', 'Basic ' .. base64Str
 end
 
+-- test set and get
+local function testsetget(etcdd)
+	print("------------testsetget begin")
+	res, err = etcdd.req.set(etcd_base_path.."hello", {message = "world"})
+	if not res then
+		print(string.format("etcd set %s fail, err: %s", etcd_base_path.."hello", err))
+		return
+	end
+	print(string.format("set key %s, revision: %s", etcd_base_path.."hello", table_dump_line(res.body.header.revision)))
+
+	res, err = etcdd.req.get(etcd_base_path.."hello")
+	if not res then
+		print(string.format("etcd get %s fail, err: %s", etcd_base_path.."hello", err))
+		return
+	end
+	print(string.format("key %s is %s", etcd_base_path.."hello", table_dump_line(res.body.kvs[1].value)))
+	
+	res, err = etcdd.req.delete(etcd_base_path.."hello")
+	if not res then
+		print(string.format("delete %s fail, err: %s", etcd_base_path.."hello", err))
+		return
+	end
+	print(string.format("delete key %s, deleted: %s", etcd_base_path.."hello", table_dump_line(res.body.deleted)))
+	
+	res, err = etcdd.req.get(etcd_base_path.."hello")
+	print(string.format("key %s is %s", etcd_base_path.."hello", table_dump_line(res.body.kvs)))
+	
+	print("------------testsetget finished")
+end
+
+-- test setx
+local function testsetx(etcdd)
+	print("------------testsetx begin")
+	res, err = etcdd.req.set(etcd_base_path.."hello", {message = "world"})
+	print(string.format("set key %s, revision: %s", etcd_base_path.."hello", table_dump_line(res.body.header.revision)))
+	
+	res, err = etcdd.req.setx(etcd_base_path.."hello", {message = "newWorld"})
+	print(string.format("etcd setx %s, res: %s", etcd_base_path.."hello", table_dump_line(res.body.header.revision)))
+	
+	res, err = etcdd.req.get(etcd_base_path.."hello")
+	print(string.format("key %s is %s, create_revision: %s, mod_revision: %s", etcd_base_path.."hello",
+		table_dump_line(res.body.kvs[1].value), res.body.kvs[1].create_revision, res.body.kvs[1].mod_revision))
+
+	res, err = etcdd.req.setx(etcd_base_path.."hello2", {message = "newhello"})
+	print(string.format("etcd setx %s, res: %s", etcd_base_path.."hello2", table_dump_line(res.body.responses)))
+
+	res, err = etcdd.req.get(etcd_base_path.."hello2")
+	print(string.format("key %s is %s", etcd_base_path.."hello2", table_dump_line(res.body.kvs)))
+
+	res, err = etcdd.req.delete(etcd_base_path.."hello")
+	res, err = etcdd.req.delete(etcd_base_path.."hello2")
+	print("------------testsetx finished")
+end
+
+-- test setnx
+local function testsetnx(etcdd)
+	print("------------testsetnx begin")
+	res, err = etcdd.req.set(etcd_base_path.."hello", {message = "world"})
+	res, err = etcdd.req.setnx(etcd_base_path.."hello", {message = "newWorld"})
+	res, err = etcdd.req.get(etcd_base_path.."hello")
+	print(string.format("key %s is %s", etcd_base_path.."hello", table_dump_line(res.body.kvs[1].value)))
+
+	res, err = etcdd.req.delete(etcd_base_path.."hello")
+	print("------------testsetnx finished")
+end
+
 skynet.start(function()
 	print("token:", create_basicauth(etcd_user, etcd_pass))
 	local etcdd = snax.uniqueservice("etcdd", etcd_hosts, etcd_user, etcd_pass, etcd_protocol)
@@ -27,39 +93,9 @@ skynet.start(function()
 	end
 	print("etcd version: ", table_dump_line(res.body))
 
-	res, err = etcdd.req.set(etcd_base_path.."hello", {message = "world"})
-	if not res then
-		print(string.format("etcd set %s fail, err: %s", etcd_base_path.."hello", err))
-		return
-	end
-	print(string.format("set key %s, res: %s", etcd_base_path.."hello", table_dump_line(res)))
-
-	res, err = etcdd.req.setnx(etcd_base_path.."hello", {message = "hello"})
-	if not res then
-		print(string.format("etcd setnx %s fail, err: %s", etcd_base_path.."hello", err))
-		return
-	end
-	print(string.format("etcd setnx %s, res: %s", etcd_base_path.."hello", table_dump_line(res)))
+	testsetget(etcdd)
 	
-	res, err = etcdd.req.setnx(etcd_base_path.."hello2", {message = "hello"})
-	if not res then
-		print(string.format("etcd setnx %s fail, err: %s", etcd_base_path.."hello2", err))
-		return
-	end
-	print(string.format("etcd setnx %s, res: %s", etcd_base_path.."hello2", table_dump_line(res)))
+	testsetx(etcdd)
 	
-	res, err = etcdd.req.get(etcd_base_path.."hello")
-	if not res then
-		print(string.format("etcd get %s fail, err: %s", etcd_base_path.."hello", err))
-		return
-	end
-	print(string.format("key %s is %s", etcd_base_path.."hello", table_dump_line(res.body)))
-
-	res, err = etcdd.req.delete(etcd_base_path.."hello")
-	if not res then
-		print(string.format("delete %s fail, err: %s", etcd_base_path.."hello", err))
-		return
-	end
-	print(string.format("delete key %s, res: %s", etcd_base_path.."hello", table_dump_line(res)))
-
+	testsetnx(etcdd)
 end)
