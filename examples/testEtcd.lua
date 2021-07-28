@@ -18,10 +18,12 @@ local function create_basicauth(user, password)
 end
 
 skynet.start(function()
-	etcd_base_path = "kbm-site-etcd"
 	print("token:", create_basicauth(etcd_user, etcd_pass))
 	local etcdd = snax.uniqueservice("etcdd", etcd_hosts, etcd_user, etcd_pass, etcd_protocol)
-	print("etcd version:", table_dump_line(etcdd.req.version().body))
-	-- print("etcd stats_leader:", table_dump_line(etcdd.req.stats_leader().body))
-	-- print("etcd stats_self:", table_dump_line(etcdd.req.stats_self().body))
+	local res, err = etcdd.req.version()
+	if not res then
+		print("etcd version fail, err: ", err)
+		return
+	end
+	print("etcd version: ", table_dump_line(res.body))
 end)
