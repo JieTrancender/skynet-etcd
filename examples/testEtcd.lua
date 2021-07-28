@@ -99,6 +99,16 @@ local function testgrant(etcdd)
 	print("------------testgrant finished")
 end
 
+-- test revoke
+local function testrevoke(etcdd)
+	print("------------testrevoke finished")
+	local res, err = etcdd.req.grant(10)
+	local ID = res.body.ID
+	res, err = etcdd.req.revoke(ID)
+	print(string.format("revoke %s revision: %s", ID, table_dump_line(res.body.header.revision)))
+	print("------------testrevoke finished")
+end
+
 skynet.start(function()
 	print("token:", create_basicauth(etcd_user, etcd_pass))
 	local etcdd = snax.uniqueservice("etcdd", etcd_hosts, etcd_user, etcd_pass, etcd_protocol)
@@ -116,4 +126,6 @@ skynet.start(function()
 	testsetnx(etcdd)
 
 	testgrant(etcdd)
+
+	testrevoke(etcdd)
 end)

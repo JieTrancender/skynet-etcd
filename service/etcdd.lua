@@ -79,6 +79,15 @@ function accept.grant(ttl, id)
     etcdCli:grant(ttl, id)
 end
 
+-- v3 support
+function response.revoke(id)
+    return etcdCli:revoke(id)
+end
+
+function accept.revoke(id)
+    etcdCli:revoke(id)
+end
+
 function response.stats_leader()
     return etcdCli:stats_leader()
 end
