@@ -27,6 +27,13 @@ skynet.start(function()
 	end
 	print("etcd version: ", table_dump_line(res.body))
 
+	res, err = etcdd.req.set(etcd_base_path.."hello", {message = "world"})
+	if not res then
+		print(string.format("etcd set %s fail, err: %s", etcd_base_path.."hello", err))
+		return
+	end
+	print(string.format("set key %s, res: %s", etcd_base_path.."hello", table_dump_line(res)))
+	
 	res, err = etcdd.req.get(etcd_base_path.."hello")
 	if not res then
 		print(string.format("etcd get %s fail, err: %s", etcd_base_path.."hello", err))

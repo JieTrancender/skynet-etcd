@@ -278,6 +278,69 @@ function refresh_jwt_token(self, timeout)
     return true, nil
 end
 
+local function set(self, key, val, attr)
+    -- verify key
+    local _, err = utils.verify_key(key)
+    if err then
+        return nil, err
+    end
+
+    key = encode_base64(key)
+    val, err = serialize_and_encode_base64(self.serializer.serialize, val)
+    if not val then
+        return nil, err
+    end
+
+    local lease
+    if attr.lease then
+        lease = attr.lease
+    end
+
+    local prev_kv
+    if attr.prev_kv then
+        prev_kv = true
+    end
+
+    local ignore_value
+    if attr.ignore_value then
+        ignore_value = true
+    end
+
+    local ignore_lease
+    if attr.ignore_lease then
+        ignore_lease = true
+    end
+
+    local opts = {
+        body = {
+            value = val,
+            key = key,
+            lease = lease,
+            prev_kv = prev_kv,
+            ignore_value = ignore_value,
+            ignore_lease = ignore_lease
+        }
+    }
+
+    local endpoint
+    endpoint, err = choose_endpoint(self)
+    if not endpoint then
+        return nil, err
+    end
+
+    local res
+    res, err = _request_uri(self, endpoint.http_host, 'POST', endpoint.full_prefix.."/kv/put", opts, self.timeout)
+    if err then
+        return nil, err
+    end
+    
+    if res.status < 300 then
+        utils.log_info("v3 set body: ", encode_json(res.body))
+    end
+
+    return res, nil
+end
+
 local function get(self, key, attr)
     -- verify key
     local _, err = utils.verify_key(key)
@@ -405,7 +468,25 @@ function _M.get(self, key, opts)
     return get(self, key, attr)
 end
 
+end  -- do
+
+do
+    local attr = {}
+function _M.set(self, key, val, opts)
+    clear_tab(attr)
+
+    key = utils.get_real_key(self.key_prefix, key)
+
+    attr.timeout = opts and opts.timeout
+    attr.lease = opts and opts.lease
+    attr.prev_kv = opts and opts.prev_kv
+    attr.ignore_value = opts and opts.ignore_value
+    attr.ignore_lease = opts and opts.ignore_lease
+
+    return set(self, key, val, attr)
 end
+    
+end  -- do
 
 function _M.version(self)
     local endpoint, err = choose_endpoint(self)
