@@ -33,6 +33,20 @@ skynet.start(function()
 		return
 	end
 	print(string.format("set key %s, res: %s", etcd_base_path.."hello", table_dump_line(res)))
+
+	res, err = etcdd.req.setnx(etcd_base_path.."hello", {message = "hello"})
+	if not res then
+		print(string.format("etcd setnx %s fail, err: %s", etcd_base_path.."hello", err))
+		return
+	end
+	print(string.format("etcd setnx %s, res: %s", etcd_base_path.."hello", table_dump_line(res)))
+	
+	res, err = etcdd.req.setnx(etcd_base_path.."hello2", {message = "hello"})
+	if not res then
+		print(string.format("etcd setnx %s fail, err: %s", etcd_base_path.."hello2", err))
+		return
+	end
+	print(string.format("etcd setnx %s, res: %s", etcd_base_path.."hello2", table_dump_line(res)))
 	
 	res, err = etcdd.req.get(etcd_base_path.."hello")
 	if not res then
@@ -47,4 +61,5 @@ skynet.start(function()
 		return
 	end
 	print(string.format("delete key %s, res: %s", etcd_base_path.."hello", table_dump_line(res)))
+
 end)

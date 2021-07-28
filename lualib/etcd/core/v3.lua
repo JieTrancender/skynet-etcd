@@ -574,6 +574,35 @@ function _M.set(self, key, val, opts)
 
     return set(self, key, val, attr)
 end
+
+    -- set key-val if key does not exists (atomic create)
+    local compare = {}
+    local success = {}
+    local failure = {}
+function _M.setnx(self, key, val, opts)
+    clear_tab(compare)
+
+    key = utils.get_real_key(self.key_prefix, key)
+
+    compare[1] = {}
+    compare[1].target = "CREATE"
+    compare[1].key = encode_base64(key)
+    compare[1].createRevision = 0
+
+    clear_tab(success)
+    success[1] = {}
+    success[1].requestPut = {}
+    success[1].requestPut.key = encode_base64(key)
+
+    local err
+    val, err = serialize_and_encode_base64(self.serializer.serialize, val)
+    if not val then
+        return nil, "failed to encode val: " .. err
+    end
+    success[1].requestPut.value = val
+
+    return txn(self, opts, compare, success, nil)
+end
     
 end  -- do
 
