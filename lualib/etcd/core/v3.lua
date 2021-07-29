@@ -6,6 +6,9 @@ local httpc         = require("http.httpc")
 local setmetatable  = setmetatable
 local random        = math.random
 local string_match  = string.match
+local string_char   = string.char
+local string_byte   = string.byte
+local string_sub    = string.sub
 local table_insert  = table.insert
 local decode_json   = cjson.decode
 local encode_json   = cjson.encode
@@ -541,6 +544,20 @@ local function txn(self, opts_arg, compare, success, failure)
         timeout or self.time)
 end
 
+local function get_range_end(key)
+    if #key == 0 then
+        return string_char(0)
+    end
+
+    local last = string_sub(key, -1)
+    key = string_sub(key, 1, #key-1)
+
+    local ascii = string_byte(last) + 1
+    local str = string_char(ascii)
+
+    return key .. str
+end
+
 do
     local attr = {}
 function _M.get(self, key, opts)
@@ -553,6 +570,23 @@ function _M.get(self, key, opts)
     clear_tab(attr)
     attr.timeout = opts and opts.timeout
     attr.revision = opts and opts.revision
+
+    return get(self, key, attr)
+end
+
+function _M.readdir(self, key, opts)
+    clear_tab(attr)
+
+    key = utils.get_real_key(self.key_prefix, key)
+
+    attr.range_end = get_range_end(key)
+    attr.revision = opts and opts.revision
+    attr.timeout = opts and opts.timeout
+    attr.limit = opts and opts.limit
+    attr.sort_order = opts and opts.sort_order
+    attr.sort_target = opts and opts.sort_target
+    attr.keys_only = opts and opts.keys_only
+    attr.count_only = opts and opts.count_only
 
     return get(self, key, attr)
 end

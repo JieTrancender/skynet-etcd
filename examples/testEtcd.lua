@@ -5,11 +5,11 @@ local snax           = require "skynet.snax"
 local crypt          = require "skynet.crypt"
 local encode_base64  = crypt.base64encode
 
-local etcd_base_path = "/config/dev/"
-local etcd_hosts = "http://127.0.0.1:2379"
-local etcd_user = "root"
-local etcd_pass = "123456"
-local etcd_protocol = "v3"
+local etcd_hosts     = skynet.getenv "etcd_hosts"
+local etcd_user      = skynet.getenv "etcd_user"
+local etcd_pass      = skynet.getenv "etcd_pass"
+local etcd_protocol  = skynet.getenv "etcd_protocol"
+local etcd_base_path = skynet.getenv "etcd_base_path"
 
 local function create_basicauth(user, password)
     local userPwd = user .. ':' .. password
@@ -142,6 +142,22 @@ local function testleases(etcdd)
 	print(string.format("leases res: %s", table_dump_line(res.body.leases)))
 end
 
+-- test etcdd
+local function testreaddir(etcdd)
+	local res, err = etcdd.req.set(etcd_base_path.."hello", {message = "world"})
+	res, err = etcdd.req.set(etcd_base_path.."hello2", {message = "world2"})
+	res, err = etcdd.req.set(etcd_base_path.."hello3", {message = "world3"})
+	res, err = etcdd.req.exec("readdir", etcd_base_path)
+	if not res then
+		print("testreaddir fail, err: ", err)
+		return
+	end
+	print(string.format("readdir res: %s", table_dump_line(res.body.kvs)))
+	etcdd.req.delete(etcd_base_path.."hello")
+	etcdd.req.delete(etcd_base_path.."hello2")
+	etcdd.req.delete(etcd_base_path.."hello3")
+end
+
 skynet.start(function()
 	print("token:", create_basicauth(etcd_user, etcd_pass))
 	local etcdd = snax.uniqueservice("etcdd", etcd_hosts, etcd_user, etcd_pass, etcd_protocol)
@@ -165,4 +181,6 @@ skynet.start(function()
 	testkeepalive(etcdd)
 
 	testleases(etcdd)
+
+	testreaddir(etcdd)
 end)
