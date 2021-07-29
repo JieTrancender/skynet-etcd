@@ -718,6 +718,56 @@ function _M.revoke(self, id)
     return _request_uri(self, endpoint.http_host, "POST", endpoint.full_prefix .. "/kv/lease/revoke", opts)
 end
 
+function _M.keepalive(self, id)
+    if id == nil then
+        return nil, "lease keepalive command needs ID argument"
+    end
+
+    local opts = {
+        body = {
+            ID = id
+        }
+    }
+
+    local endpoint, err = choose_endpoint(self)
+    if not endpoint then
+        return nil, err
+    end
+
+    return _request_uri(self, endpoint.http_host, "POST", endpoint.full_prefix .. "/lease/keepalive", opts)
+end
+
+function _M.timetolive(self, id, keys)
+    if id == nil then
+        return nil, "lease timetolive command needs ID argument"
+    end
+
+    keys = keys or false
+    local opts = {
+        body = {
+            ID = id,
+            keys = keys
+        }
+    }
+
+    local endpoint, err = choose_endpoint(self)
+    if not endpoint then
+        return nil, err
+    end
+
+    local res
+    res, err = _request_uri(self, endpoint.http_host, "POST", endpoint.full_prefix .. "/kv/lease/timetolive", opts)
+    if res and res.status == 200 then
+        if res.body.keys and next(res.body.keys) then
+            for i, key in ipairs(res.body.keys) do
+                res.body.keys[i] = decode_base64(key)
+            end
+        end
+    end
+    
+    return res, err
+end
+
 do
     local attr = {}
 function _M.delete(self, key, opts)
