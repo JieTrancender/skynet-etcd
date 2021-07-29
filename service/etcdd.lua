@@ -102,8 +102,13 @@ function response.timetolive(id, keys)
     return etcdCli:timetolive(id, keys)
 end
 
-function accept.timetoulive(id, keys)
+function accept.timetolive(id, keys)
     etcdCli:timetolive(id, keys)
+end
+
+-- v3 support
+function response.leases()
+    return etcdCli:leases()
 end
 
 function response.stats_leader()
