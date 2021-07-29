@@ -175,6 +175,18 @@ local function testrmdir(etcdd)
 	print(string.format("rmdir#readdir res: %s", table_dump_line(res.body.kvs)))
 end
 
+-- test watch
+local function testwatch(etcdd)
+	local res, err = etcdd.req.set(etcd_base_path.."hello", {message = "world"})
+	res, err = etcdd.req.exec("watch", etcd_base_path.."hello")
+	if not res then
+		print("testwatch fail, err: ", err)
+		return
+	end
+
+	print(string.format("watch res: ", table_dump_line(res)))
+end
+
 skynet.start(function()
 	print("token:", create_basicauth(etcd_user, etcd_pass))
 	local etcdd = snax.uniqueservice("etcdd", etcd_hosts, etcd_user, etcd_pass, etcd_protocol)
@@ -185,21 +197,23 @@ skynet.start(function()
 	end
 	print("etcd version: ", table_dump_line(res.body))
 
-	testsetget(etcdd)
+	-- testsetget(etcdd)
 	
-	testsetx(etcdd)
+	-- testsetx(etcdd)
 	
-	testsetnx(etcdd)
+	-- testsetnx(etcdd)
 
-	testgrant(etcdd)
+	-- testgrant(etcdd)
 
-	testrevoke(etcdd)
+	-- testrevoke(etcdd)
 
-	testkeepalive(etcdd)
+	-- testkeepalive(etcdd)
 
-	testleases(etcdd)
+	-- testleases(etcdd)
 
-	testreaddir(etcdd)
+	-- testreaddir(etcdd)
 
-	testrmdir(etcdd)
+	-- testrmdir(etcdd)
+
+	testwatch(etcdd)
 end)

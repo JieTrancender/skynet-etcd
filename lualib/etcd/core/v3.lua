@@ -3,6 +3,7 @@ local typeof        = require("etcd.core.typeof")
 local utils         = require("etcd.core.utils")
 local cjson         = require("cjson.safe")
 local httpc         = require("http.httpc")
+local encode_args   = require("etcd.core.encode_args")
 local setmetatable  = setmetatable
 local random        = math.random
 local string_match  = string.match
@@ -544,6 +545,78 @@ local function txn(self, opts_arg, compare, success, failure)
         timeout or self.time)
 end
 
+local function request_chunk(self, method, path, opts, timeout)
+    local body, err
+    if opts and opts.body and next(opts.body) then
+        body, err = encode_json(opts.body)
+        if not body then
+            return nil, err
+        end
+    end
+
+    local query
+    if opts and opts.query and next(opts.query) then
+        query = encode_args(opts.query)
+        path = path .. "?" .. query
+    end
+
+    local recvheader = {}
+    local headers = {}
+    if self.is_auth then
+        -- authentication request not need auth request
+        _, err = refresh_jwt_token(self, timeout)
+        if err then
+            return nil, err
+        end
+        headers.Authorization = self.jwt_token
+    end
+
+    local endpoint
+    endpoint, err = choose_endpoint(self)
+    if not endpoint then
+        return nil, err
+    end
+    
+    utils.log_info("request_chunk", method, endpoint.http_host, path, body, query)
+    print("request_chunk", method, path, body, query)
+    local status, body = httpc.request(method, endpoint.http_host, endpoint.full_prefix..path, recvheader, headers, body)
+    print("request_chunk res", status, utils.table_dump_line(body))
+    if status >= 300 then
+        return nil, "failed to watch data, response code: " .. status
+    end
+
+    local function read_watch()
+        utils.log_info("request_chunk", table_dump_line(body))
+        local body, err = decode_json(body)
+        if not body then
+            return nil, "failed to decode json body: " .. (err or "unknown")
+        end
+
+        if body.result.events then
+            for _, event in ipairs(body.result.events) do
+                if event.kv.value then
+                    event.kv.value = decode_base64(event.kv.value)
+                    event.kv.value = decode_json(event.kv.value)
+                end
+                event.kv.key = decode_base64(event.kv.key)
+                if event.prev_kv then
+                    event.prev_kv.value = decode_base64(event.prev_kv.value)
+                    event.prev_kv.value = decode_base64(event.prev_kv.value)
+                    event.prev_kv.key = decode_base64(event.prev_kv.key)
+                end
+            end
+        end
+
+        return body
+    end
+
+    if opts.need_cancel == true then
+        return read_watch, nil, http_cli
+    else
+        return read_watch
+    end
+end
+
 local function get_range_end(key)
     if #key == 0 then
         return string_char(0)
@@ -556,6 +629,88 @@ local function get_range_end(key)
     local str = string_char(ascii)
 
     return key .. str
+end
+
+local function watch(self, key, attr)
+    -- verify key
+    if #key == 0 then
+        key = string_char(0)
+    end
+
+    key = encode_base64(key)
+
+    local range_end
+    if attr.range_end then
+        range_end = encode_base64(attr.range_end)
+    end
+
+    local prev_kv
+    if attr.prev_kv then
+        prev_kv = true
+    end
+
+    local start_revision
+    if attr.start_revision then
+        start_revision = attr.start_revision
+    end
+
+    local watch_id
+    if attr.watch_id then
+        watch_id = attr.watch_id
+    end
+
+    local progress_notify
+    if attr.progress_notify then
+        progress_notify = true
+    end
+
+    local fragment
+    if attr.fragment then
+        fragment = true
+    end
+
+    local filters
+    if attr.filters then
+        filters = attr.filters
+    end
+
+    local need_cancel
+    if attr.need_cancel then
+        need_cancel = true
+    end
+
+    local opts = {
+        body = {
+            create_request = {
+                key = key,
+                range_end = range_end,
+                prev_kv = prev_kv,
+                start_revision = start_revision,
+                watch_id = watch_id,
+                progress_notify = progress_notify,
+                fragment = fragment,
+                filters = filters
+            }
+        },
+        need_cancel = need_cancel
+    }
+
+    local endpoint, err = choose_endpoint(self)
+    if not endpoint then
+        return nil, err
+    end
+
+    local callback_func, http_cli
+    callback_func, err, http_cli = request_chunk(self, "POST", "/watch", opts, attr.timeout or self.timeout)
+    if not callback_func then
+        return nil, err
+    end
+
+    if opts.need_cancel == true then
+        return callback_func, nil, http_cli
+    end
+
+    return callback_func
 end
 
 do
@@ -572,6 +727,23 @@ function _M.get(self, key, opts)
     attr.revision = opts and opts.revision
 
     return get(self, key, attr)
+end
+
+function _M.watch(self, key, opts)
+    clear_tab(attr)
+
+    key = utils.get_real_key(self.key_prefix, key)
+
+    attr.start_revision = opts and opts.start_revision
+    attr.timeout = opts and opts.timeout
+    attr.progress_notify = opts and opts.progress_notify
+    attr.filters = opts and opts.filters
+    attr.prev_kv = opts and opts.prev_kv
+    attr.watch_id = opts and opts.watch_id
+    attr.fragment = opts and opts.fragment
+    attr.need_cancel = opts and opts.need_cancel
+
+    return watch(self, key, attr)
 end
 
 function _M.readdir(self, key, opts)
