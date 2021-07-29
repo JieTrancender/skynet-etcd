@@ -130,6 +130,18 @@ local function testkeepalive(etcdd)
 	print("------------testkeepalive finished")
 end
 
+-- test leases
+local function testleases(etcdd)
+	local res, err = etcdd.req.grant(10)
+	print("grant lease", res.body.ID)
+	res, err = etcdd.req.leases()
+	if not res then
+		print("testleases fail, err:", err)
+		return
+	end
+	print(string.format("leases res: %s", table_dump_line(res.body.leases)))
+end
+
 skynet.start(function()
 	print("token:", create_basicauth(etcd_user, etcd_pass))
 	local etcdd = snax.uniqueservice("etcdd", etcd_hosts, etcd_user, etcd_pass, etcd_protocol)
@@ -151,4 +163,6 @@ skynet.start(function()
 	testrevoke(etcdd)
 
 	testkeepalive(etcdd)
+
+	testleases(etcdd)
 end)

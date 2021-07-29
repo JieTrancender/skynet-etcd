@@ -768,6 +768,15 @@ function _M.timetolive(self, id, keys)
     return res, err
 end
 
+function _M.leases(self)
+    local endpoint, err = choose_endpoint(self)
+    if not endpoint then
+        return nil, err
+    end
+
+    return _request_uri(self, endpoint.http_host, "POST", endpoint.full_prefix .. "/lease/leases")
+end
+
 do
     local attr = {}
 function _M.delete(self, key, opts)
