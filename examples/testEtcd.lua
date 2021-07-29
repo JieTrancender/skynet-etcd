@@ -101,12 +101,33 @@ end
 
 -- test revoke
 local function testrevoke(etcdd)
-	print("------------testrevoke finished")
+	print("------------testrevoke begin")
 	local res, err = etcdd.req.grant(10)
 	local ID = res.body.ID
 	res, err = etcdd.req.revoke(ID)
 	print(string.format("revoke %s revision: %s", ID, table_dump_line(res.body.header.revision)))
 	print("------------testrevoke finished")
+end
+
+-- test keepalive and timetolive
+local function testkeepalive(etcdd)
+	print("------------testkeepalive begin")
+	local res, err = etcdd.req.grant(10)
+	local ID = res.body.ID
+	res, err = etcdd.req.keepalive(ID)
+	if not res then
+		print("testkeepalive fail, err:", err)
+		return
+	end
+	print(string.format("keepalive %s, res: %s", ID, table_dump_line(res.body.result.TTL)))
+
+	res, err = etcdd.req.timetolive(ID)
+	print(string.format("timetolive %s, grantedTTL: %s, TTL: %s", ID, res.body.grantedTTL, res.body.TTL))
+	skynet.sleep(1300)
+	res, err = etcdd.req.timetolive(ID)
+	print(table_dump_line(res.body))
+	print(string.format("timetolive %s, grantedTTL: %s, TTL: %s", ID, res.body.grantedTTL, res.body.TTL))
+	print("------------testkeepalive finished")
 end
 
 skynet.start(function()
@@ -128,4 +149,6 @@ skynet.start(function()
 	testgrant(etcdd)
 
 	testrevoke(etcdd)
+
+	testkeepalive(etcdd)
 end)

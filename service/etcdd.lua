@@ -88,6 +88,24 @@ function accept.revoke(id)
     etcdCli:revoke(id)
 end
 
+-- v3 support
+function response.keepalive(id)
+    return etcdCli:keepalive(id)
+end
+
+function accept.keepalive(id)
+    etcdCli:keepalive(id)
+end
+
+-- v3 support
+function response.timetolive(id, keys)
+    return etcdCli:timetolive(id, keys)
+end
+
+function accept.timetoulive(id, keys)
+    etcdCli:timetolive(id, keys)
+end
+
 function response.stats_leader()
     return etcdCli:stats_leader()
 end
