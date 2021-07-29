@@ -111,6 +111,14 @@ function response.leases()
     return etcdCli:leases()
 end
 
+function response.exec(cmd, ...)
+    return etcdCli[cmd](etcdCli, ...)
+end
+
+function accept.exec(cmd, ...)
+    etcdCli[cmd](etcdCli, ...)
+end
+
 function response.stats_leader()
     return etcdCli:stats_leader()
 end
