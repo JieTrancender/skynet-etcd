@@ -823,6 +823,18 @@ function _M.delete(self, key, opts)
 
     return delete(self, key, attr)
 end
+
+function _M.rmdir(self, key, opts)
+    clear_tab(attr)
+
+    key = utils.get_real_key(self.key_prefix, key)
+
+    attr.range_end = get_range_end(key)
+    attr.timeout = opts and opts.timeout
+    attr.prev_kv = opts and opts.prev_kv
+
+    return delete(self, key, attr)
+end
     
 end  -- do
 

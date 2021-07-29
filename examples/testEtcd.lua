@@ -158,6 +158,23 @@ local function testreaddir(etcdd)
 	etcdd.req.delete(etcd_base_path.."hello3")
 end
 
+-- test rmdir
+local function testrmdir(etcdd)
+	local res, err = etcdd.req.set(etcd_base_path.."hello", {message = "world"})
+	res, err = etcdd.req.set(etcd_base_path.."hello2", {message = "world2"})
+	res, err = etcdd.req.set(etcd_base_path.."hello3", {message = "world3"})
+	res, err = etcdd.req.exec("readdir", etcd_base_path)
+	print(string.format("rmdir#readdir res: %s", table_dump_line(res.body.kvs)))
+	res, err = etcdd.req.exec("rmdir", etcd_base_path)
+	if not res then
+		print("testrmdir fail, err: ", err)
+		return
+	end
+
+	res, err = etcdd.req.exec("readdir", etcd_base_path)
+	print(string.format("rmdir#readdir res: %s", table_dump_line(res.body.kvs)))
+end
+
 skynet.start(function()
 	print("token:", create_basicauth(etcd_user, etcd_pass))
 	local etcdd = snax.uniqueservice("etcdd", etcd_hosts, etcd_user, etcd_pass, etcd_protocol)
@@ -183,4 +200,6 @@ skynet.start(function()
 	testleases(etcdd)
 
 	testreaddir(etcdd)
+
+	testrmdir(etcdd)
 end)
