@@ -3,13 +3,13 @@ local etcd = require "etcd.etcd"
 
 local etcdCli
 function init( ... )
-    local etcdHosts, user, password, protocol = ...
+    local etcdHosts, user, password, protocol, serializer = ...
     local opt = {
         http_host = generateEtcdHosts(etcdHosts),
         user = user,
         password = password,
         protocol = protocol,
-        serializer = "json"  -- 默认使用json格式配置
+        serializer = serializer or "json"  -- 默认使用json格式配置
     }
 
     local err

@@ -1,28 +1,32 @@
-local skynet        = require("skynet")
-local typeof        = require("etcd.core.typeof")
-local utils         = require("etcd.core.utils")
-local cjson         = require("cjson.safe")
-local httpc         = require("http.httpc")
-local setmetatable  = setmetatable
-local random        = math.random
-local string_match  = string.match
-local string_char   = string.char
-local string_byte   = string.byte
-local string_sub    = string.sub
-local table_insert  = table.insert
-local decode_json   = cjson.decode
-local encode_json   = cjson.encode
-local now           = os.time
-local crypt         = require "skynet.crypt"
-local encode_base64 = crypt.base64encode
-local decode_base64 = crypt.base64decode
+local skynet            = require("skynet")
+local typeof            = require("etcd.core.typeof")
+local utils             = require("etcd.core.utils")
+local cjson             = require("cjson.safe")
+local httpc             = require("http.httpc")
+local setmetatable      = setmetatable
+local random            = math.random
+local string_match      = string.match
+local string_char       = string.char
+local string_byte       = string.byte
+local string_sub        = string.sub
+local table_insert      = table.insert
+local decode_json       = cjson.decode
+local encode_json       = cjson.encode
+local now               = os.time
+local crypt             = require "skynet.crypt"
+local encode_base64     = crypt.base64encode
+local decode_base64     = crypt.base64decode
+local INIT_COUNT_RESIZE = 2e8
+local health_check      = nil
 
 local _M = {}
 
 local mt = {__index = _M}
 
 local clear_tab = function (t)
-    t = {}
+    for k in pairs(t) do
+        t[k] = nil
+    end
 end
 
 local table_exist_keys = function (t)
@@ -247,7 +251,7 @@ function refresh_jwt_token(self, timeout)
     end
 
     if self.requesting_token then
-        self.sema:wait(timeout)
+        skynet.sleep(timeout)
         if self.jwt_token and now() - self.last_auth_time < 60 * 3 + random(0, 60) then
             return true, nil
         end
