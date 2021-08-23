@@ -25,7 +25,9 @@ local _M = {
 local mt = { __index = _M }
 
 local clear_tab = function (t)
-    t = {}
+    for k in pairs(t) do
+        t[k] = nil
+    end
 end
 
 local table_exist_keys = function (t)
