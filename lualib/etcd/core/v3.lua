@@ -1,8 +1,10 @@
 local skynet        = require("skynet")
+local socket        = require "skynet.socket"
 local typeof        = require("etcd.core.typeof")
 local utils         = require("etcd.core.utils")
 local cjson         = require("cjson.safe")
 local httpc         = require("http.httpc")
+local internal      = require "etcd.core.internal"
 local encode_args   = require("etcd.core.encode_args")
 local setmetatable  = setmetatable
 local random        = math.random
@@ -23,7 +25,9 @@ local _M = {}
 local mt = {__index = _M}
 
 local clear_tab = function (t)
-    t = {}
+    for k in pairs(t) do
+        t[k] = nil
+    end
 end
 
 local table_exist_keys = function (t)
@@ -184,15 +188,9 @@ function _M.new(opts)
         })
     end
 
-    -- local sema, err = semaphore.new()
-    -- if not sema then
-    --     return nil, err
-    -- end
-
     return setmetatable({
         last_auth_time = skynet.now(),  -- save last Authentication time
         last_refresh_jwt_err = nil,
-        -- sema = sema,
         jwt_token = nil,  -- last Authentication token
         is_auth = not not (user and password),
         user = user,
@@ -248,7 +246,7 @@ function refresh_jwt_token(self, timeout)
     end
 
     if self.requesting_token then
-        self.sema:wait(timeout)
+        skynet.sleep(timeout)
         if self.jwt_token and now() - self.last_auth_time < 60 * 3 + random(0, 60) then
             return true, nil
         end
@@ -277,12 +275,14 @@ function refresh_jwt_token(self, timeout)
         return nil, err
     end
 
-    local res
-    res, err = _request_uri(self, endpoint.http_host, 'POST',
-                                  endpoint.full_prefix .. "/auth/authenticate",
-                                  opts, timeout, true)
+    local res, ok
+    ok, res, err = pcall(_request_uri, self, endpoint.http_host, 'POST', endpoint.full_prefix.."/auth/authenticate",
+        opts, timeout, true)
     self.requesting_token = false
-
+    if not ok then
+        return nil, res
+    end
+    
     if err then
         self.last_refresh_jwt_err = err
         -- wake_up_everyone(self)
@@ -546,10 +546,10 @@ local function txn(self, opts_arg, compare, success, failure)
 end
 
 local function request_chunk(self, method, path, opts, timeout)
-    local body, err
+    local content, err
     if opts and opts.body and next(opts.body) then
-        body, err = encode_json(opts.body)
-        if not body then
+        content, err = encode_json(opts.body)
+        if not content then
             return nil, err
         end
     end
@@ -577,19 +577,51 @@ local function request_chunk(self, method, path, opts, timeout)
         return nil, err
     end
     
-    utils.log_info("request_chunk", method, endpoint.http_host, path, body, query)
-    print("request_chunk", method, path, body, query)
-    local status, body = httpc.request(method, endpoint.http_host, endpoint.full_prefix..path, recvheader, headers, body)
-    print("request_chunk res", status, utils.table_dump_line(body))
-    if status >= 300 then
+    utils.log_info("request_chunk", method, endpoint.http_host, path, content, query)
+    local stream = httpc.request_stream(method, endpoint.http_host, endpoint.full_prefix..path, headers, content)
+    if stream.status >= 300 then
         return nil, "failed to watch data, response code: " .. status
     end
 
     local function read_watch()
-        utils.log_info("request_chunk", table_dump_line(body))
+        if not stream.connected then
+            -- 尝试重连
+            local ok
+            while true do
+                if self.is_auth then
+                    -- 需要先清除之前的token
+                    self.jwt_token = nil
+                    local ok, bool, err = pcall(refresh_jwt_token, self, timeout)
+                    if not ok or not bool then
+                        goto continue
+                    end
+                end
+
+                endpoint, err = choose_endpoint(self)
+                if endpoint then
+                    headers.Authorization = self.jwt_token
+                    ok, stream = pcall(httpc.request_stream, method, endpoint.http_host, endpoint.full_prefix..path, headers, content)
+                    if ok and stream.status == 200 and stream.connected then
+                        break
+                    end
+                end
+
+                ::continue::
+                skynet.error("trying to watch at host", endpoint.http_host)
+                skynet.sleep(100)
+            end
+        end
+        
+        local body = stream()
+        utils.log_info("request_chunk read_watch", table_dump_line(body))
         local body, err = decode_json(body)
         if not body then
             return nil, "failed to decode json body: " .. (err or "unknown")
+        end
+
+        if body.error then
+            skynet.error(table_dump_line(body.error))
+            return body
         end
 
         if body.result.events then
