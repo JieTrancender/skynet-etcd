@@ -4,3 +4,6 @@
 [submodule "3rd/lua-cjson"]
 	path = 3rd/lua-cjson
 	url = https://github.com/mpx/lua-cjson.git
+[submodule "3rd/lua-typeof"]
+	path = 3rd/lua-typeof
+	url = git@github.com:iresty/lua-typeof.git
