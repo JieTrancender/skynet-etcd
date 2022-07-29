@@ -83,6 +83,31 @@ local function _request_uri(self, method, uri, opts, timeout, ignore_auth)
     if opts and opts.query and table_nkeys(opts.query) > 0 then
         uri = uri .. "?" .. encode_args(opts.query)
     end
+
+    local headers = {}
+    local keepalive = true
+    if self.is_auth then
+        if not ignore_auth then
+            local _, err = refresh_jwt_token(self, timeout)
+            if err then
+                return nil, err
+            end
+            headers.Authorization = self.jwt_token
+        else
+            keepalive = false
+        end
+    end
+
+    if self.extra_headers and type(self.extra_headers) == "table" then
+        for key, value in pairs(self.extra_headers) do
+            if not unmodifiable_headers[string_lower(key)] then
+                headers[key] = value
+            end
+        end
+        utils.log_info("request uri headers: ", encode_json(headers))
+    end
+
+    local status, body = httpc.request(method, host, uri, recvheader, headers, body)
 end
 
 function _M.new(opts)
